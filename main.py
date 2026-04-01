@@ -3,6 +3,8 @@ from pydantic import BaseModel
 import joblib
 import pandas as pd
 
+
+
 # Load the saved model
 model = joblib.load('model.pkl')
 
