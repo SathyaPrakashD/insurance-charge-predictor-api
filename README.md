@@ -1,45 +1,118 @@
-# Insurance Charge Predictor — End to End ML Deployment
+# Insurance Charge Predictor API
 
-A production-deployed ML system that predicts medical insurance charges
-via a REST API. Built with a tuned sklearn Pipeline, served via FastAPI,
-and deployed on Render.
+[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat&logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![scikit-learn](https://img.shields.io/badge/scikit--learn-1.6.1-F7931E?style=flat&logo=scikit-learn&logoColor=white)](https://scikit-learn.org/)
+[![Render](https://img.shields.io/badge/Deployed%20on-Render-46E3B7?style=flat&logo=render&logoColor=white)](https://render.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Live API](https://img.shields.io/badge/Live%20API-Online-brightgreen?style=flat)](https://insurance-charge-predictor-api.onrender.com/predict)
+
+> **Production-deployed end-to-end ML system** that predicts medical insurance charges from patient demographics via a REST API. Trained with a tuned sklearn pipeline (GridSearchCV, R² = 0.8458), served via FastAPI, and deployed on Render.
 
 ---
 
-## Live API
+## 🚀 Live Demo
 
-```
-POST https://insurance-charge-predictor-api.onrender.com/predict
+**API Endpoint:** `POST https://insurance-charge-predictor-api.onrender.com/predict`
+
+Try it instantly from your terminal:
+
+```bash
+curl -X POST https://insurance-charge-predictor-api.onrender.com/predict \
+  -H "Content-Type: application/json" \
+  -d '{"age": 19, "sex": "female", "bmi": 27.9, "children": 0, "smoker": "yes", "region": "southwest"}'
 ```
 
-**Sample Request:**
+**Response:**
 ```json
-{
-    "age": 19,
-    "sex": "female",
-    "bmi": 27.9,
-    "children": 0,
-    "smoker": "yes",
-    "region": "southwest"
-}
-```
-
-**Sample Response:**
-```json
-{
-    "predicted_charges": 17809.85
-}
+{"predicted_charges": 17809.85}
 ```
 
 ---
 
-## C1 — Hyperparameter Tuning with GridSearchCV
+## 📋 Table of Contents
 
-Instead of relying on sklearn's default parameters, GridSearchCV
-systematically searched 27 combinations across 5 folds — 135 total
-training runs — to find the optimal configuration.
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [Tech Stack](#tech-stack)
+- [Model Performance](#model-performance)
+- [API Reference](#api-reference)
+- [Project Structure](#project-structure)
+- [Local Setup](#local-setup)
+- [Key Engineering Decisions](#key-engineering-decisions)
 
-### Parameter Grid
+---
+
+## Overview
+
+This project demonstrates a **complete ML engineering workflow** from raw data to a live, callable API:
+
+1. **Data preprocessing** using a `ColumnTransformer` pipeline (StandardScaler + OneHotEncoder)
+2. **Hyperparameter tuning** via GridSearchCV across 135 combinations (27 configs × 5-fold CV)
+3. **Model serialisation** with joblib for reproducible, environment-safe deployment
+4. **REST API** built with FastAPI + Pydantic for type-safe request validation
+5. **Cloud deployment** on Render with pinned dependency versions to prevent environment drift
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                     Training Pipeline                    │
+│                                                          │
+│  Raw CSV  ──►  EDA  ──►  ColumnTransformer Pipeline     │
+│                              │                           │
+│                    ┌─────────▼──────────┐                │
+│                    │   GridSearchCV      │                │
+│                    │  27 configs × 5 CV  │                │
+│                    │  = 135 total runs   │                │
+│                    └─────────┬──────────┘                │
+│                              │                           │
+│                    Best Params Selected                  │
+│                    R² = 0.8458 (5-fold CV)               │
+│                              │                           │
+│                    joblib.dump() ──► model.pkl           │
+└─────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────┐
+│                    Serving Pipeline                      │
+│                                                          │
+│  HTTP POST /predict                                      │
+│       │                                                  │
+│       ▼                                                  │
+│  Pydantic Validation  ──►  joblib.load(model.pkl)        │
+│                                  │                       │
+│                         Preprocess + Predict             │
+│                                  │                       │
+│                         JSON Response                    │
+└─────────────────────────────────────────────────────────┘
+                              │
+                    Deployed on Render
+                    Auto-deploy on git push
+```
+
+---
+
+## Tech Stack
+
+| Layer | Technology | Purpose |
+|---|---|---|
+| ML Framework | scikit-learn 1.6.1 | Pipeline, preprocessing, RandomForest |
+| Hyperparameter Tuning | GridSearchCV | 135-run systematic search |
+| API Framework | FastAPI | REST endpoint with auto-generated docs |
+| Data Validation | Pydantic | Type-safe request schema |
+| Model Serialisation | joblib | Persist full pipeline to disk |
+| Data Manipulation | pandas | DataFrame construction for inference |
+| Deployment | Render | Cloud hosting with auto-deploy |
+| Notebook | Jupyter / Google Colab | Training and experimentation |
+
+---
+
+## Model Performance
+
+### Hyperparameter Search Space
 
 | Parameter | Values Tried | Count |
 |---|---|---|
@@ -47,16 +120,16 @@ training runs — to find the optimal configuration.
 | `max_depth` | None, 5, 10 | 3 |
 | `min_samples_split` | 2, 5, 10 | 3 |
 
-**3 × 3 × 3 = 27 combinations × 5 folds = 135 total training runs**
+**Total training runs:** 3 × 3 × 3 = 27 combinations × 5 folds = **135 runs**
 
 ### Results
 
-| Model | R² | How Measured |
+| Model | R² Score | Evaluation Method |
 |---|---|---|
-| Untuned Random Forest | 0.8382 | 5-fold CV |
-| **Tuned Random Forest** | **0.8458** | 5-fold CV (GridSearchCV) |
+| Baseline Random Forest (default params) | 0.8382 | 5-fold cross-validation |
+| **Tuned Random Forest (GridSearchCV)** | **0.8458** | 5-fold cross-validation |
 
-### Best Parameters Found
+### Best Parameters
 
 ```
 n_estimators      = 300
@@ -64,130 +137,90 @@ max_depth         = 5
 min_samples_split = 5
 ```
 
-### Code
+---
 
-```python
-from sklearn.model_selection import GridSearchCV
+## API Reference
 
-param_grid = {
-    'model__n_estimators'     : [100, 200, 300],
-    'model__max_depth'        : [None, 5, 10],
-    'model__min_samples_split': [2, 5, 10]
+### `POST /predict`
+
+Predicts insurance charges based on patient demographics.
+
+**Request Body**
+
+```json
+{
+  "age": 19,
+  "sex": "female",
+  "bmi": 27.9,
+  "children": 0,
+  "smoker": "yes",
+  "region": "southwest"
 }
+```
 
-grid_search = GridSearchCV(
-    pipeline,
-    param_grid,
-    cv=5,
-    scoring='r2',
-    verbose=1
-)
+**Field Descriptions**
 
-grid_search.fit(X_train, y_train)
+| Field | Type | Description | Example Values |
+|---|---|---|---|
+| `age` | int | Age of the primary beneficiary | 18–64 |
+| `sex` | str | Biological sex | `"male"`, `"female"` |
+| `bmi` | float | Body mass index | 15.0–55.0 |
+| `children` | int | Number of dependents | 0–5 |
+| `smoker` | str | Smoking status | `"yes"`, `"no"` |
+| `region` | str | US region of coverage | `"northeast"`, `"northwest"`, `"southeast"`, `"southwest"` |
 
-print("Best parameters:", grid_search.best_params_)
-print("Best R²        :", round(grid_search.best_score_, 4))
+**Response**
+
+```json
+{
+  "predicted_charges": 17809.85
+}
+```
+
+**Interactive Docs:** Available at `/docs` (Swagger UI) when running locally.
+
+---
+
+## Project Structure
+
+```
+insurance-charge-predictor-api/
+│
+├── 01_train_tune_export_model.ipynb  # Full training pipeline: EDA → tuning → serialisation
+├── main.py                           # FastAPI application with /predict endpoint
+├── model.pkl                         # Serialised sklearn pipeline (preprocessor + model)
+├── requirements.txt                  # Pinned production dependencies
+├── .gitignore                        # Standard Python ignores
+├── LICENSE                           # MIT License
+└── README.md                         # This file
 ```
 
 ---
 
-## C2 — Model Serialisation
+## Local Setup
 
-The best pipeline — preprocessor + tuned RandomForest — was frozen
-to disk using joblib. This allows the model to be loaded anywhere:
-locally, on a server, or inside a Docker container.
+**Prerequisites:** Python 3.10+
 
-```python
-import joblib
+```bash
+# 1. Clone the repository
+git clone https://github.com/SathyaPrakashD/insurance-charge-predictor-api.git
+cd insurance-charge-predictor-api
 
-joblib.dump(grid_search.best_estimator_, 'model.pkl')
-print("Model saved to model.pkl")
+# 2. Create and activate a virtual environment
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# 3. Install dependencies
+pip install -r requirements.txt
+
+# 4. Run the API server
+uvicorn main:app --reload --port 8000
 ```
 
-**What gets saved inside model.pkl:**
-- ColumnTransformer (StandardScaler for numeric, OneHotEncoder for categorical)
-- Tuned RandomForestRegressor (best params from GridSearchCV)
+The API will be live at `http://localhost:8000`.
+Visit `http://localhost:8000/docs` for the interactive Swagger UI.
 
-> **Why joblib over pickle?**
-> joblib is optimised for large numpy arrays — faster and more efficient
-> than Python's built-in pickle for sklearn models.
-
----
-
-## C3 — FastAPI Endpoint
-
-A REST API was built using FastAPI. It accepts patient details,
-runs them through the full pipeline, and returns a predicted charge.
-
-```python
-from fastapi import FastAPI
-from pydantic import BaseModel
-import joblib
-import pandas as pd
-
-model = joblib.load('model.pkl')
-app = FastAPI()
-
-class InsuranceInput(BaseModel):
-    age: int
-    sex: str
-    bmi: float
-    children: int
-    smoker: str
-    region: str
-
-@app.post('/predict')
-def predict(data: InsuranceInput):
-    input_df = pd.DataFrame([data.dict()])
-    prediction = model.predict(input_df)[0]
-    return {'predicted_charges': round(prediction, 2)}
-```
-
-### What Each Part Does
-
-| Component | Purpose |
-|---|---|
-| `BaseModel` | Validates and defines the shape of incoming data |
-| `joblib.load` | Loads the full tuned pipeline from disk |
-| `@app.post('/predict')` | Creates a POST endpoint at /predict |
-| `data.dict()` | Converts input to dictionary for DataFrame |
-| `model.predict` | Runs the full pipeline — preprocess + predict |
-
----
-
-## C4 — Deployment on Render
-
-The API was deployed to Render — a cloud platform that hosts the
-service 24/7 with automatic deploys on every GitHub push.
-
-### Deployment Configuration
-
-| Setting | Value |
-|---|---|
-| **Environment** | Python |
-| **Build Command** | `pip install -r requirements.txt` |
-| **Start Command** | `uvicorn main:app --host 0.0.0.0 --port 10000` |
-
-### requirements.txt
-
-```
-fastapi
-uvicorn
-pydantic
-pandas
-scikit-learn==1.6.1
-```
-
-> **Why pin scikit-learn?**
-> A .pkl file is tightly coupled to the sklearn version that created it.
-> Pinning ensures training and serving environments are identical —
-> preventing silent failures in production.
-
----
-
-## C5 — Show-off Checkpoint
-
-A live prediction request from Python:
+**Test with Python:**
 
 ```python
 import requests
@@ -201,44 +234,35 @@ payload = {
     "region": "southwest"
 }
 
-response = requests.post(
-    "https://insurance-charge-predictor-api.onrender.com/predict",
-    json=payload
-)
-
-print(response.json())
-# {'predicted_charges': 17809.85}
+response = requests.post("http://localhost:8000/predict", json=payload)
+print(response.json())  # {'predicted_charges': 17809.85}
 ```
 
 ---
 
-## Portfolio Statement
+## Key Engineering Decisions
 
-> *"Built and deployed an end-to-end insurance charge prediction API.
-> Tuned a Random Forest with GridSearchCV across 135 combinations.
-> Cross-validated R² improved from 0.8382 to 0.8458. Deployed as a
-> REST API on Render — live and callable from anywhere."*
+**Why GridSearchCV over manual tuning?**
+Systematic search eliminates guesswork and provides evidence for parameter choices. 135 training runs give confidence that the selected configuration is objectively optimal within the defined search space.
+
+**Why pin scikit-learn to 1.6.1?**
+`.pkl` files are tightly coupled to the sklearn version that created them. A version mismatch between training and serving environments causes silent failures. Pinning ensures reproducibility across any deployment target.
+
+**Why joblib over pickle?**
+joblib is optimised for large NumPy arrays — significantly faster and more memory-efficient than Python’s built-in `pickle` for sklearn pipelines that contain fitted transformers and estimators.
+
+**Why a full sklearn Pipeline?**
+Bundling preprocessing (StandardScaler, OneHotEncoder) with the model in a single `Pipeline` object ensures the same transformations are applied consistently during both training and inference, eliminating train/serve skew.
+
+**Why FastAPI?**
+FastAPI provides automatic request validation via Pydantic, auto-generated OpenAPI docs (`/docs`), and async support — making it the modern standard for Python ML APIs.
 
 ---
 
-## End to End Architecture
+## License
 
-```
-Raw CSV data
-    ↓
-EDA + Feature Analysis
-    ↓
-ColumnTransformer Pipeline (systematic preprocessing)
-    ↓
-GridSearchCV (135 runs, best params selected with evidence)
-    ↓
-Tuned RandomForest (R² = 0.8458, cross-validated)
-    ↓
-Serialised to model.pkl
-    ↓
-FastAPI endpoint (/predict)
-    ↓
-Deployed on Render
-    ↓
-Live URL — callable from anywhere
-```
+This project is licensed under the [MIT License](LICENSE).
+
+---
+
+*Built as part of an end-to-end ML engineering portfolio — demonstrating the full journey from raw data to a live, production-ready API.*
